@@ -8,13 +8,14 @@ class PDFSplitter:
     root = Tk()
     inputpdf = None
     destinationPath = ""
+    pdfName = StringVar()
     pathStr = StringVar()
     warningStr = StringVar()
 
     def __init__(self):
         self.destinationPath = pathlib.Path(__file__).parent.absolute()
         self.root.title("Separador de PDFs")
-        self.root.geometry("950x600+10+20")
+        self.root.geometry("950x500+10+20")
         self.mainFrame = Frame(self.root)
         self.editFrame = Frame(self.mainFrame)
         self.textbox = Text(self.editFrame)
@@ -24,14 +25,17 @@ class PDFSplitter:
         self.folderButton = Button(self.actionFrame, text = 'Seleccionar carpeta PDF', command=self.askForPath)
         self.generateFilesButton = Button(self.actionFrame, text = 'Exportar PDFs', state=DISABLED, command=self.exportPDFPages)
         self.textActionFrame = Frame(self.actionFrame)
-        self.clearButton = Button(self.textActionFrame, text = 'Copiar', command=self.clearText)
+        self.clearButton = Button(self.textActionFrame, text = 'Eliminar', command=self.clearText)
         self.copyButton = Button(self.textActionFrame, text = 'Copiar', command=self.copyText)
         self.pasteButton = Button(self.textActionFrame, text = 'Pegar', command=self.pasteText)
         self.messageFrame = Frame(self.root)
         self.warningLabel = Label(self.messageFrame, anchor='w', textvariable=self.warningStr)
         self.warningStr.set('Estado: Cargando...')
+        self.pdfNameLabel = Label(self.messageFrame, anchor='w', textvariable=self.pdfName)
+        self.pdfName.set('Esperando PDF...')
+        self.pdfNameLabel.config(bg='yellow')
         self.pathLabel = Label(self.messageFrame, anchor='w',  textvariable=self.pathStr)
-        self.pathStr.set(f'Ruta destino: {str(self.destinationPath)}')
+        self.pathStr.set(f'Directorio: {str(self.destinationPath)}')
         self.pathLabel.config(bg='green')
         self.setWarings()
 
@@ -39,18 +43,20 @@ class PDFSplitter:
         self.uploadPDF(file)
 
     def askForPDF(self):
-        filename = askopenfilename()
-        if filename:
-            self.uploadPDF(filename)
+        file = askopenfilename()
+        if file:
+            self.uploadPDF(file)
 
     def askForPath(self):
         self.destinationPath = askdirectory()
-        self.pathStr.set(f'Ruta destino: {str(self.destinationPath)}')
+        self.pathStr.set(f'Directorio: {str(self.destinationPath)}')
 
-    def uploadPDF(self, filename):
+    def uploadPDF(self, file):
         try:
-            self.inputpdf = PdfFileReader(open(filename, "rb"))
-            self.pathStr.set(str(filename))
+            self.inputpdf = PdfFileReader(open(file, "rb"))
+            self.pathStr.set(f'Directorio: {pathlib.Path(file).parent.absolute()}')
+            self.pdfName.set(f'PDF: {pathlib.Path(file).name}')
+            self.pdfNameLabel.config(bg='green')
             self.textbox.delete('1.0', END)
             for i in range(self.inputpdf.numPages):
                 self.textbox.insert(END, f"Página #{i+1}\n")
@@ -93,6 +99,9 @@ class PDFSplitter:
         self.textbox.delete('1.0', END)
         self.textbox.insert(END, self.textbox.clipboard_get())
 
+    def filePath(self, name):
+        return str(self.destinationPath) + '/' + name + '.pdf'
+
     def packPDFPages(self):
         pagesNames = self.getTextInput()
         PDFPagesDict = {}
@@ -103,12 +112,35 @@ class PDFSplitter:
             PDFPagesDict[pagesNames[i]].addPage(self.inputpdf.getPage(i))
         return PDFPagesDict
 
-    def exportPDFPages(self):
-        filePath = lambda x: str(self.destinationPath) + '/' + x + '.pdf'
+    def replaceOmitCancel(self):
+        duplicateFiles = 0
+        answer = True
         for name, pdf in self.packPDFPages().items():
-            with open(filePath(name), "wb") as outputStream:
-                pdf.write(outputStream)
-        mb.showinfo('Completado', f'Sus PDFs han sido generados en el directorio {self.destinationPath}')
+            if pathlib.Path(self.filePath(name)).is_file():
+                duplicateFiles += 1
+        if (duplicateFiles > 0):
+            answer = mb.askyesnocancel(
+                f'{duplicateFiles} Archivos duplicados',
+                f'{duplicateFiles} de los PDFs que está intentando generar ya existen en el directorio \n {self.destinationPath} \n ¿Desea reemplazarlos?',
+            )
+        return answer
+
+    def exportPDFPages(self):
+        duplicateAction = self.replaceOmitCancel()
+        if (duplicateAction is None):
+            mb.showinfo(
+                'Cancelado',
+                'Sus PDFs NO han sido generados'
+            )
+            return 0
+        for name, pdf in self.packPDFPages().items():
+            if (duplicateAction or not pathlib.Path(self.filePath(name)).is_file()):
+                with open(self.filePath(name), "wb") as outputStream:
+                    pdf.write(outputStream)
+        mb.showinfo(
+            'Completado',
+            f'Sus PDFs han sido generados en el directorio {self.destinationPath}'
+        )
 
     def render(self):
         self.root.grid_rowconfigure(1, weight=1)
@@ -134,6 +166,7 @@ class PDFSplitter:
         self.generateFilesButton.pack(fill='both')
         self.messageFrame.grid(row=1, sticky="nsew", padx=10, pady=(0, 5))
         self.warningLabel.pack(fill='both')
+        self.pdfNameLabel.pack(fill='both')
         self.pathLabel.pack(fill='both')
         self.root.mainloop()
 
