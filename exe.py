@@ -3,6 +3,7 @@ from tkinter import *
 from tkinter.filedialog import askopenfilename, askdirectory
 from tkinter import messagebox as mb
 from PyPDF2 import PdfFileWriter, PdfFileReader
+import webbrowser
 
 class PDFSplitter:
     root = Tk()
@@ -28,13 +29,14 @@ class PDFSplitter:
         self.clearButton = Button(self.textActionFrame, text = 'Eliminar', command=self.clearText)
         self.copyButton = Button(self.textActionFrame, text = 'Copiar', command=self.copyText)
         self.pasteButton = Button(self.textActionFrame, text = 'Pegar', command=self.pasteText)
-        self.messageFrame = Frame(self.root)
+        self.messageFrame = Frame(self.actionFrame)
+        self.helpButton = Button(self.actionFrame, text = 'Ayuda', command=self.goToHelp)
         self.warningLabel = Label(self.messageFrame, anchor='w', textvariable=self.warningStr)
         self.warningStr.set('Estado: Cargando...')
         self.pdfNameLabel = Label(self.messageFrame, anchor='w', textvariable=self.pdfName)
         self.pdfName.set('Esperando PDF...')
         self.pdfNameLabel.config(bg='yellow')
-        self.pathLabel = Label(self.messageFrame, anchor='w',  textvariable=self.pathStr)
+        self.pathLabel = Label(self.mainFrame, anchor='w',  textvariable=self.pathStr)
         self.pathStr.set(f'Directorio: {str(self.destinationPath)}')
         self.pathLabel.config(bg='green')
         self.setWarings()
@@ -99,6 +101,12 @@ class PDFSplitter:
         self.textbox.delete('1.0', END)
         self.textbox.insert(END, self.textbox.clipboard_get())
 
+    def goToHelp(self):
+         webbrowser.open(
+            'https://www.rethink.org/advice-and-information/about-mental-illness/learn-more-about-symptoms/worried-about-your-mental-health/',
+            new=0, autoraise=True
+        )
+
     def filePath(self, name):
         return str(self.destinationPath) + '/' + name + '.pdf'
 
@@ -133,30 +141,31 @@ class PDFSplitter:
                 'Sus PDFs NO han sido generados'
             )
             return 0
-        for name, pdf in self.packPDFPages().items():
+        pdfPack = self.packPDFPages().items()
+        for name, pdf in pdfPack:
             if (duplicateAction or not pathlib.Path(self.filePath(name)).is_file()):
                 with open(self.filePath(name), "wb") as outputStream:
                     pdf.write(outputStream)
         mb.showinfo(
             'Completado',
-            f'Sus PDFs han sido generados en el directorio {self.destinationPath}'
+            f'{len(pdfPack)} PDFs han sido generados en el directorio {self.destinationPath}'
         )
 
     def render(self):
         self.root.grid_rowconfigure(1, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
-        self.mainFrame.grid(row=0, sticky="ew", padx=10, pady=(25, 5))
+        self.mainFrame.grid(row=0, column=0, padx=10, pady=(25, 5), sticky=N+S+E+W)
         self.mainFrame.grid_rowconfigure(0, weight=1)
-        self.mainFrame.grid_columnconfigure(1, weight=1)
+        self.mainFrame.grid_columnconfigure(0, weight=1)
         self.textActionFrame.grid_rowconfigure(0, weight=1),
         self.textActionFrame.grid_columnconfigure(3, weight=1)
-        self.editFrame.grid(row=0, column=0, sticky="ns")
+        self.editFrame.grid(row=0, column=0, sticky=N+S+E+W)
         self.scrollbar.pack(side=RIGHT, fill=Y)
-        self.textbox.pack()
+        self.textbox.pack(fill="both")
         self.textbox.config(yscrollcommand=self.scrollbar.set)
         self.textbox.bind("<Key>", self.setWarings)
         self.scrollbar.config(command=self.textbox.yview)
-        self.actionFrame.grid(row=0, column=1, sticky="nsew")
+        self.actionFrame.grid(row=0, column=1, sticky=N+S+E+W)
         self.uploadButton.pack(fill='both')
         self.textActionFrame.pack(fill='both')
         self.clearButton.grid(row=0, column=0, sticky=N+S+E+W)
@@ -164,10 +173,13 @@ class PDFSplitter:
         self.pasteButton.grid(row=0, column=2, sticky=N+S+E+W)
         self.folderButton.pack(fill='both')
         self.generateFilesButton.pack(fill='both')
-        self.messageFrame.grid(row=1, sticky="nsew", padx=10, pady=(0, 5))
+        self.messageFrame.pack(fill='both', pady=10)
+        self.messageFrame.grid_rowconfigure(0, weight=1),
+        self.messageFrame.grid_columnconfigure(1, weight=1)
+        self.helpButton.pack(fill="y", side="bottom", anchor='se')
         self.warningLabel.pack(fill='both')
         self.pdfNameLabel.pack(fill='both')
-        self.pathLabel.pack(fill='both')
+        self.pathLabel.grid(row=1, column=0, sticky="ws", pady=10)
         self.root.mainloop()
 
 pdfs = PDFSplitter()
